@@ -1,4 +1,5 @@
 ### Hi there 👋
+I am a student working with Neuro Imaging research but am trying to transition out of academic life. I like coding and have some decent expereince with R, SPSS, and Python. I have extensive research skills and experience and if you feel that I can contribute to your company or oganization in some way please do not hesitate to reach out. 
 
 <!--
 **mattgehr94/mattgehr94** is a ✨ _special_ ✨ repository because its `README.md` (this file) appears on your GitHub profile.
