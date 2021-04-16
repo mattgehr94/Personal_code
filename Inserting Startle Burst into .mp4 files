@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Thu Apr  8 08:04:55 2021
+
+@author: matthew
+"""
+#necessary installs and imports 
+#pip install playsound #Plays audio from .mp4 file 
+#pip install librosa  #manipulate audio 
+#conda install -c conda-forge ffmep #Needed as part of librosa install 
+#pip install moviepy #Needed for uploading .mp4 file 
+#pip install sounddevice
+
+import os as os 
+import moviepy.editor as mp
+import librosa as librosa
+import librosa.display
+import numpy as np
+from moviepy.audio.AudioClip import AudioArrayClip
+from natsort import natsorted
+import matplotlib.pyplot as plt 
+
+
+#Setting working directory 
+os.chdir('')
+
+
+for root, dirs, files in os.walk(""): #Pathway to folder where you have a bunch of .mp4 files 
+    files = natsorted(files)
+    for file in files:
+        if os.path.splitext(file)[1] == '.mp4':
+            filePath = os.path.join(root, file)
+            audio, sr = librosa.load(filePath)
+            plt.close()
+            fig = librosa.display.waveplot(audio, sr = sr) 
+            ax = plt.subplot(111)
+            ax.plot()
+            plt.savefig(os.getcwd()+'new folder where you want the graphs to go'+file[:-4]+".png")
+# puts all the graphed audio from the .mp4 files into a new folder called
+            
+        
+#Trying to put the thing into a function 
+def burst_insert(input_path, start_point_sec, output_path):
+    #Upload the videoclips in question 
+    videoclip = mp.VideoFileClip(input_path)
+    audioclip = videoclip.audio
+    audio_array = audioclip.to_soundarray() #Gets it's in a form that can be manipulated 
+    
+    #Selecting portion of the clip to add a white noise to 
+    audio_duration = videoclip.duration #Duration of the audio from the .mp4 file 
+    start_point_sec = start_point_sec #Where in the sound wave of the video audio to insert noise burst needs to be manually entered 
+    start_point_samp = int(start_point_sec * audioclip.fps) #Converts the second insertion to sample amount 
+    burst_samp = int(audioclip.fps * .05) #how many samples are in the noise burst
+    burst_window = audio_array[start_point_samp : start_point_samp + burst_samp] #Isolating part of the audio clip to add burst to 
+    #Creating very accurate burst 
+    def GenerateNoise(signal, SNR_dB): # desiredSNR [dB]; signal is an array with complex values
+        n = np.zeros((len(signal),1), dtype=complex) #Sets an array the length of the burst window that is full of 0s and able to take imaginary numbers 
+        # SNR = var_signal / var_n
+        snr = 10.0**(SNR_dB/10.0) # Desired linear SNR
+        var_signal = signal.var() # Measure power of signal by variance within the signal 
+        var_n = var_signal / snr # Calculate required noise power for desired SNR. So takes the variance of the signal and divides it by the desired SNR
+        if (var_n == 0): # In case of a null signal
+           var_n = snr
+        e = np.random.normal(0, np.sqrt(var_n*2.0)/2.0, size=(len(signal), 2)).view(np.complex) # Generate noise with calculated power
+        #Generates a random normally distributed array with mean = 0, sd = sqrt(var_n *20)/ 2 and the size of the array is the length of the signal. The 2 indicates how many columns it should be and the complex allows for imaginary numbers  
+        for i in range(0, len(signal)):
+            n[i,0] = n[i,0] + e[i][0]
+        print(10.0*np.log10((np.var(signal))/(np.var(n))))
+        return n
+    
+    noise = GenerateNoise(burst_window, -90)
+    #Implementing the adjusted audio into the orignial audio stream
+    audio_array[start_point_samp : start_point_samp + burst_samp] = audio_array[start_point_samp : start_point_samp + burst_samp] + noise #Puts the modified segment into the original audio 
+    
+    #having to write the audio into an array since python needs it this way to write into an .mp4 file 
+    new_audio = AudioArrayClip(audio_array, fps = audioclip.fps)
+    videoclip.audio = new_audio
+    #Writing a new .mp4 into folder with adjusted audio
+    videoclip.write_videofile(output_path, temp_audiofile = 'temp-audio.m4a', remove_temp = True, codec = 'libx264', audio_codec = 'aac') #writes the new .mp4 file 
+#End of function 
+
+
+input_path = ('pathway')
+output_path = ('pathway')
+
+#Calling the function (middle argument is the time in seconds of insertion)
+burst_insert(input_path, 6.56, output_path)
+#This take the newly adjusted audio and plots it in a graph 
+audio, sr = librosa.load('pathway') #Gets the sampling rate and the actual audio data for the .mp4 file
+librosa.display.waveplot(audio, sr = sr) #Plotting the sound wave 
+
+
