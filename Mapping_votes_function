@@ -1,0 +1,243 @@
+##Installling all needed packages for the function 
+install.packages("usmap")
+library(usmap)
+install.packages("usdata")
+library(usdata)
+install.packages("tidyverse")
+library(tidyverse)
+install.packages("ggplot2")
+library(ggplot2)
+install.packages("stringr")
+library(stringr)
+install.packages("openintro")
+library(openintro)
+#######
+
+###Setting worrking directory 
+setwd("")
+
+#Plotting election function
+plot_election_results <- function(whichday, electoral, vote_type, region) {
+  
+  regionname <- toString(deparse(substitute(region)))
+  regionname <- str_remove(regionname,".")
+  regionname <- str_replace(regionname,"_"," ")
+  regionstates <- tolower(abbr2state(region)) #Gets the regions within the "us_map" function in a character vector 
+  
+  if (whichday < 4){
+    title <- gsub(" ","",paste("2020-11-0", 7))
+    meta <- tail(list.files(getwd(), pattern = title, full.name = TRUE),1)
+    numberofelectors <- read.csv("/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Classes/Fall 2020/Coding class/Final_project/electoralvotes.csv")[,2]
+    data <- read.csv(list.files(meta, full.name = TRUE)) #Sets conditional argument for all the less than 4 days after election 
+  } else if (whichday < 7){
+    title <- gsub(" ","",paste("2020-11-0",3 + whichday))
+    meta <- tail(list.files(getwd(), pattern = title, full.name = TRUE),1)
+    numberofelectors <- read.csv("/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Classes/Fall 2020/Coding class/Final_project/electoralvotes.csv")[,2]
+    data <- read.csv(list.files(meta, full.name = TRUE)) # Sets conditional argument for days less than 7 
+  } else{
+    title <- gsub(" ","",paste("2020-11-",3 + whichday))
+    meta <- tail(list.files(getwd(), pattern = title, full.name = TRUE),1)
+    temp <- getwd()
+    numberofelectors <- read.csv("/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Classes/Fall 2020/Coding class/Final_project/electoralvotes.csv")[,2]
+    meta <- str_c(meta,"/presidential/")
+    setwd(meta)
+    meta <- str_c(meta,list.files(getwd(),pattern =".csv"))
+    data <- read.csv(meta)
+    setwd(temp) #Set conditional argument that pulls data when election data changes from "president" to presidential 
+  }
+  
+  print(numberofelectors)
+  extdata <- subset(data, select = c("fips", "state","votes","absentee_votes","results_trumpd","results_bidenj","results_absentee_trumpd","results_absentee_bidenj","last_updated")) 
+  FIPS <- floor(subset(extdata,select = 1)/1000)
+  State <- subset(extdata,select = 2)
+  Votes <- subset(extdata,select = 3)
+  absentee <- subset(extdata,select = 4)
+  results_trumpd <- subset(extdata,select = 5)
+  results_bidenj <- subset(extdata,select = 6)
+  results_absentee_trumpd <- subset(extdata,select = 7)
+  results_absentee_bidenj <- subset(extdata,select = 8)
+  last_updated <- subset(extdata,select = 9) #Takes each variables of interest and creates own object for easier manipulation and plotting 
+  
+  for (i in 1:nrow(last_updated)){
+    last_updated[i,1] <- substr(last_updated[i,1],9,10)
+  }
+  last_updated <- as.numeric(unlist(last_updated)) # Goes through the current data set after the if else statements and creates numeric vector indicating how many days after the election the row represents 
+  
+  bidenvotes <- matrix(0,51,1)
+  trumpvotes <- matrix(0,51,1) #Sets up matrix for the votes for each candidate 
+  
+  statename <- matrix(0,51,1)
+  orgfips <- matrix(0,51,1)
+  
+  if (vote_type == "total"){
+    i <- 1
+    j <- 1
+    while(i <= 51){
+      while(State[j,1] == State[j + 1,1] && j < 3159){
+        if (whichday + 3 >=  last_updated[j]){
+          bidenvotes[i, 1] <- bidenvotes[i,1] + (results_bidenj[j,1])
+          trumpvotes[i, 1] <- trumpvotes[i,1] + (results_trumpd[j,1])
+        } 
+        j <- j + 1 
+      }
+      bidenvotes[i, 1] <- bidenvotes[i, 1] + results_bidenj[j,1]
+      trumpvotes[i, 1] <- trumpvotes[i, 1] + results_trumpd[j,1]
+      statename[i, 1] <- State[j - 1,1]
+      orgfips[i,1] <- FIPS[j - 1, 1]
+      j <- j + 1
+      i <- i + 1
+    }
+    bidenvotes[i - 1, 1] <- bidenvotes[i - 1,1] + results_bidenj[j - 1,1]
+    trumpvotes[i - 1, 1] <- trumpvotes[i - 1,1] + results_trumpd[j - 1,1] #Calculates the votes when the voting type is "total" 
+  }else if (vote_type == "absentee"){
+    i <- 1
+    j <- 1
+    while(i <= 51){
+      while(State[j,1] == State[j + 1,1] && j < 3159){
+        if (whichday + 3 >=  last_updated[j]){
+          bidenvotes[i, 1] <- bidenvotes[i,1] + results_absentee_bidenj[j,1]
+          trumpvotes[i, 1] <- trumpvotes[i,1] + results_absentee_trumpd[j,1]
+        }
+        j <- j + 1
+      }
+      bidenvotes[i, 1] <- bidenvotes[i,1] + results_absentee_bidenj[j,1]
+      trumpvotes[i, 1] <- trumpvotes[i,1] + results_absentee_trumpd[j,1]
+      statename[i, 1] <- State[j,1]
+      orgfips[i,1] <- FIPS[j - 1, 1]
+      j <- j + 1
+      i <- i + 1
+    }
+    bidenvotes[i - 1, 1] <- bidenvotes[i - 1,1] + results_absentee_bidenj[j - 1,1]
+    trumpvotes[i - 1, 1] <- trumpvotes[i - 1,1] + results_absentee_trumpd[j - 1,1] #Calculates the voting results when the voting type is "absentee" 
+  }else if (vote_type == "in-person"){
+    i <- 1
+    j <- 1
+    while(i <= 51){
+      while(State[j,1] == State[j + 1,1] && j < 3159){
+        if (whichday + 3 >=  last_updated[j]){
+          bidenvotes[i, 1] <- bidenvotes[i,1] + results_bidenj[j,1] - results_absentee_bidenj[j,1]
+          trumpvotes[i, 1] <- trumpvotes[i,1] + results_trumpd[j,1] - results_absentee_trumpd[j,1]
+        }
+        j <- j + 1
+      }
+      bidenvotes[i, 1] <- bidenvotes[i,1] + results_bidenj[j,1] - results_absentee_bidenj[j,1]
+      trumpvotes[i, 1] <- trumpvotes[i,1] + results_trumpd[j,1] - results_absentee_trumpd[j,1]
+      statename[i, 1] <- State[j - 1,1]
+      orgfips[i,1] <- FIPS[j - 1, 1]
+      j <- j + 1
+      i <- i + 1
+    }
+    bidenvotes[i - 1, 1] <- bidenvotes[i - 1,1] + results_bidenj[j - 1,1] - results_absentee_bidenj[j - 1,1]
+    trumpvotes[i - 1, 1] <- trumpvotes[i - 1,1] + results_trumpd[j - 1,1] - results_absentee_trumpd[j - 1,1]
+  } #Calculates the voting resutls when the voting type is "in-person" 
+  
+  fips <- sort(orgfips)
+  biden <- fips
+  trump <- fips
+  
+  df <- data.frame(name=orgfips, value = statename)
+  state <- df[match(fips, df$name),2]
+  state <- gsub("-"," ",state)
+  biden <- cbind(biden,state)
+  trump <- cbind(trump,state) #binds the voting result of the state into object 
+  
+  bdf <- data.frame(name=orgfips, value = bidenvotes)
+  tdf <- data.frame(name=orgfips, value = trumpvotes)
+  votebiden <- bdf[match(fips, bdf$name),2]
+  votetrump <- tdf[match(fips, tdf$name),2] #Creates each candidate dataframe for the votes and matches to the FIPS for the state
+  
+  biden <- cbind(biden,as.numeric(votebiden))
+  trump <- cbind(trump,as.numeric(votetrump))
+  
+  if (electoral == "F"){
+    percentbiden <- 100*votebiden/(votebiden + votetrump)
+    biden <- cbind(biden,percentbiden) #Ctreates percentage of votes for biden
+    
+    percenttrump <- 100*votetrump/(votebiden + votetrump)
+    trump <- cbind(trump,percenttrump)  #Creates perecentage of votes for trump 
+    
+    biden <- as.data.frame(biden)
+    biden[,3:4] <- sapply(biden[,3:4], as.numeric)
+    
+    trump <- as.data.frame(trump)
+    trump[,3:4] <- sapply(trump[,3:4], as.numeric)
+    
+    biden <- as_tibble(biden)
+    trump <- as_tibble(trump)
+    
+    names(biden) <- c("fips","state","votesbiden","percentbiden")
+    names(trump) <- c("fips","state","votestrump","percenttrump") #Each own data frame for candidate that has the fips, state, percent of the state vote and raw vote count for each candidate 
+    
+    if (is.null(region)){
+      title = str_c("US Election 2020 results - ", vote_type, " votes after ", whichday, " days - popular votes")
+    }else{
+      title = str_c("US Election 2020 results - ", vote_type, " votes after ", whichday, " days - popular votes for ",  regionname, " region")
+    } #Conditional statement that takes into account the null region argument and creates title for future plot     
+    p <- plot_usmap(
+      data = biden, values = "percentbiden", include = region,labels = TRUE, color = "blue"
+    ) + 
+      scale_fill_continuous(
+        low = "red", high = "blue", name = "Percentage for Biden", label = scales::comma, limits = c(0,100)
+      ) +
+      labs(title = title) + 
+      theme(legend.position = "right",plot.title = element_text(size = 20, face = "bold"))
+    p$layers[[2]]$aes_params$size <- 5
+    print(p) # Overall conditional statement that plots popular vote on a  continuous scale for BIDEN 
+  }else if (electoral == "T"){
+    electoralbiden <- votebiden > votetrump
+    electoralbiden <- 1*electoralbiden
+    electoraltrump <- votetrump > votebiden
+    electoraltrump <- 1*electoraltrump #If the raw vote is greater in each state than the other candidate then awarded the electoral vote 
+    
+    biden <- cbind(biden,as.numeric(electoralbiden))
+    trump <- cbind(trump,as.numeric(electoraltrump))
+    
+    biden <- cbind(biden,numberofelectors)
+    trump <- cbind(trump,numberofelectors)
+    
+    biden <- as.data.frame(biden)
+    biden[,3] <- sapply(biden[,3], as.numeric)
+    biden[,4] <- sapply(biden[,4], as.factor)
+    
+    trump <- as.data.frame(trump)
+    trump[,3] <- sapply(trump[,3], as.numeric)
+    trump[,4] <- sapply(trump[,4], as.factor)
+    
+    biden <- as_tibble(biden)
+    trump <- as_tibble(trump)
+    
+    
+    if (is.null(region)){
+      bidenelectoral <- sum(numberofelectors*electoralbiden)
+      trumpelectoral <- sum(numberofelectors*electoraltrump) #If region is not specified then entire country is summed 
+    } else{
+      indexes <- which(biden$state%in%regionstates)
+      bidenelectoral <- sum(numberofelectors[indexes]*electoralbiden[indexes])
+      trumpelectoral <- sum(numberofelectors[indexes]*electoraltrump[indexes])
+    }
+    names(biden) <- c("fips","state","votesbiden","electoralbiden","numberofelectors")
+    names(trump) <- c("fips","state","votestrump","electoraltrump","numberofelectors")
+    
+    if (is.null(region)){
+      title = str_c("US Election 2020 results - ", vote_type, " votes after ", whichday, " days - electoral votes")
+      subtitle = str_c("Biden: ", bidenelectoral ," electoral votes\nTrump: ", trumpelectoral," electoral votes")
+    }else{
+      title = str_c("US Election 2020 results - ", vote_type, " votes after ", whichday, " days - electoral votes for ", regionname," region")
+      subtitle = str_c("Biden: ", bidenelectoral ," electoral votes\nTrump: ", trumpelectoral," electoral votes")
+    } # Cretaes title for final plot regardless if the region is not specified 
+    p <- plot_usmap(
+      data = biden, values = "electoralbiden", include = region, labels = TRUE, color = "black") + 
+      scale_fill_manual(values = c(`0` = "red", `1` = "blue"), name = "Candidate",labels = c("Trump","Biden")) +
+      labs(title = title,
+           subtitle = subtitle) + 
+      theme(legend.position = "right",plot.title = element_text(size = 20, face = "bold"),plot.subtitle = element_text(size = 15))
+    p$layers[[2]]$aes_params$size <- 5
+    print(p) 
+  } #Final plot 
+}
+
+##Testing function 
+plot_election_results(12, "T", "total", NULL)
+plot_election_results(5, "T", "absentee", NULL)
+plot_election_results(7, "F", "in-person", .south_region)
+
