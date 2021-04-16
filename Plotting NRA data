@@ -1,0 +1,53 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Wed Nov 25 11:16:35 2020
+
+@author: matthew
+"""
+
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import matplotlib.animation as animation
+from IPython.display import HTML
+import numpy as np
+
+#Question1: In the lecture notes for Manipulating Data Frames in Python, I produced a series of bar plots that showed how NRA support for Democratic and Republican members of the House of Representatives as shifted over time. In this problem, I would like you to show the same information in an animation. Your animation should show the same (or similar) series of bar plots in a repeating cycle. Be sure to choose settings (e.g. don’t make it too fast) so that it is easy to read. This problem should be done in Python 
+
+# Load NRA data 
+NRAdata=pd.read_csv("/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Classes/Fall 2020/Coding class/Data Sets/nra-grades 2.csv")
+house=NRAdata[(NRAdata.iloc[:,1]=="US House")&(NRAdata.iloc[:,4]=="General")]
+all_counts_hs=house.grade.value_counts()
+grades=['A+','A','AQ','A-','B+','B','B-','C+','C','C-','D+','D','D-','F','?']
+all_counts_hs=all_counts_hs[grades]
+# Break up data into Democrats and Republican data
+house_R=house[house.iloc[:,6]=="R"]
+house_D=house[house.iloc[:,6]=="D"]
+counts_R=house_R.grade.value_counts()
+counts_D=house_D.grade.value_counts()
+counts_R=counts_R.reindex(grades,fill_value=0)
+counts_D=counts_D.reindex(grades,fill_value=0)
+# Function to plot a single year of NRA house data
+def nra_plot(year):
+ if year not in [2010,2012,2014,2016]:
+     return
+ house_R_year=house_R[house_R.year==year]
+ house_D_year=house_D[house_D.year==year]
+ counts_R_year=house_R_year.grade.value_counts()
+ counts_D_year=house_D_year.grade.value_counts()
+ counts_R_year=counts_R_year.reindex(grades,fill_value=0)
+ counts_D_year=counts_D_year.reindex(grades,fill_value=0)
+ plt.clf()
+ xpos=np.arange(len(all_counts_hs))
+ plt.bar(x=xpos+0.15,height=counts_R_year,label="Republican",width=0.3,color="red")
+ plt.bar(x=xpos-0.15,height=counts_D_year,width=0.3,label="Democrat",color="blue")
+ plt.xlabel("grade")
+ plt.title("NRA Grades for %d house Races" % year)
+ plt.xticks(xpos,grades)
+ plt.legend()
+
+# Show animation of 2010-2016 NRA data
+fig, ax = plt.subplots(figsize=(15, 8))
+animator = animation.FuncAnimation(fig, nra_plot, frames=[2010,2012,2014,2016
+], interval=1200)
