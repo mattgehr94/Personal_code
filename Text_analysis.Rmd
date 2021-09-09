@@ -1,0 +1,116 @@
+---
+title: "Text_analysis"
+author: "Matt Gehr"
+date: "7/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(tokenizers)
+library(stringr)
+library(textreadr)
+library(wordcloud)
+library(RColorBrewer)
+library(wordcloud2) 
+library(tm)
+```
+Uploading transcript text file, the key word .csv and determing which 'speaker' the interviewee is
+```{r}
+text_doc<- read.delim("/Users/matthew/Downloads/Document.txt")
+key_word_doc<- read.csv("/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Professional development/Innovation_corps/Text_analysis/TTI_Sarah_0.csv")
+speaker_id<-text_doc[grep(pattern = "Speaker 1", x = text_doc$Audio.file),] #Change the 'pattern' argument to designate the interviewee's voice 
+```
+isolating the interviewee responses ("speaker" has to be determined manually)
+```{r}
+safe_guard<- text_doc[grep(pattern = "Speaker", x = text_doc$Audio.file),] 
+
+interviewee<- text_doc[text_doc$Audio.file == c("Speaker 1") ,]
+responses<- as.data.frame(x = length(speaker_id), y = 1) 
+responses_row<-1
+
+for (observation in 1:nrow(text_doc)) {
+  if (text_doc$Audio.file[observation] == speaker_id && text_doc$Audio.file[observation+1] != safe_guard ) {
+    interviewee_text <- text_doc$Audio.file[observation:(observation+1)] 
+    responses[responses_row,] <- interviewee_text[2]
+    responses_row <- responses_row + 1 
+  }
+}
+
+#This chunk makes sure that only the interviewee responses are isolated and put into a new object 
+```
+Take each response row and count for key words
+```{r}
+match_words_df<- data.frame()
+full_responses<- data.frame()
+#empty data frames needed for the loop 
+for (observation in 1:nrow(responses)){
+  row_text<- responses$`length(speaker_id)`[observation]
+  row_words<- tokenize_words(row_text)
+  tab<- table(row_words[[1]])
+  row_words_df <- data.frame(word = names(tab), count = as.numeric(tab))
+  match_words_row<- subset(x= row_words_df, subset = row_words_df$word %in% key_word_doc$key_words)
+  if(length(match_words_row$word) == 0){
+    next
+  } 
+  if(length(match_words_row$word >=1)){
+    full_responses<- rbind(row_text, full_responses)
+    #This pulls the full response that contains a key word determined in the .csv file 
+  }
+  match_words_df<- rbind(match_words_row, match_words_df)
+}
+full_responses<- full_responses %>%
+  
+#str_wrap(width = 80, indent = 0, exdent = 0)
+```
+Graphing and putting the key words into a table 
+```{r}
+match_words_df %>%
+  group_by(word) %>%
+  ggplot(aes(word, fill = word))+
+  geom_bar(stat = "count")
+#Graphing each key word that appears in the interviewee response 
+
+match_words_df %>%
+  group_by(word)%>%
+  summarise(total_count = sum(count))
+#Puts each key word and count it appears in a table
+```
+Putting notes into a word cloud 
+```{r}
+text<- paste("So where members can earn an Apple watch at no cost to them by meeting their monthly health goals. So if they meet their monthly health goals, been at and actually funds that payment for them. So it really heavily incentivizes them to meet their monthly health goals that are actually determined by our Attain program. We also partner with Virgin, puts on some programs for monthly and quarterly challenges to help promote that, provide reporting. I'm trying to think of all the things that we do. We have maternity programs, we have disease management, care management, case management, you know, then we have our 24 hour nurse line.")
+
+
+
+
+
+```
+
+
+
+
+
+
+Longer manual way 
+```{r}
+text<- paste("So where members can earn an Apple watch at no cost to them by meeting their monthly health goals. So if they meet their monthly health goals, been at and actually funds that payment for them. So it really heavily incentivizes them to meet their monthly health goals that are actually determined by our Attain program. We also partner with Virgin, puts on some programs for monthly and quarterly challenges to help promote that, provide reporting. I'm trying to think of all the things that we do. We have maternity programs, we have disease management, care management, case management, you know, then we have our 24 hour nurse line.")
+```
+
+Organizing and matching key words with text words 
+```{r}
+words <- tokenize_words(text)
+length(words)
+length(words[[1]])
+tab <- table(words[[1]])
+tab <- data.frame(word = names(tab), count = as.numeric(tab))
+
+key_words<- paste("Virgin wellness program weight") %>%
+  tokenize_words()
+key_words<- table(key_words[[1]])
+key_words<- data.frame(word = names(key_words), count = as.numeric(key_words))
+
+
+match_words<- tab[tab$word == c(key_words$word) ,]
+View(match_words)
+```
+
