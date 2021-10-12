@@ -1,0 +1,662 @@
+---
+title: "ssVEP_2"
+author: "Matt Gehr"
+date: "9/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(dplyr)
+library(purrr)
+library(afex)
+library(readxl)
+library(corrr)
+library(ggpubr)
+#devtools::install_github("AndrewHFarkas/EMEGShelper", force = T)
+```
+
+```{r Getting the EPN and LPP sensors}
+ar_folder <- "/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/EEG/from_andrew_emegs_ssvepvid/VidSSVEP ARFiles/CategoryAverages12_3_19/Hamp"
+
+
+EPN_sensor_numbers <- c(23, 25, 27, 60, 62, 64)
+LPP_sensor_numbers <- c(19, 31, 32, 48, 56)
+OCC_sensor_numbers <- c(26,27,29,30,31,63,64)
+
+EPN_raw <- EMEGShelper::read_ar_files(data_folders = ar_folder,
+                                    extract_channels = EPN_sensor_numbers,
+                                    patterns = "ar.hamp8",
+                                    include_channel_name = T,
+                                    include_file_name = T)
+
+LPP_raw <- EMEGShelper::read_ar_files(data_folders = ar_folder,
+                                    extract_channels= LPP_sensor_numbers,
+                                    patterns = "ar.hamp8",
+                                    include_channel_name = T,
+                                    include_file_name = T)
+
+OCC_raw <- EMEGShelper::read_ar_files(data_folders = ar_folder,
+                                    extract_channels= OCC_sensor_numbers,
+                                    patterns = "ar.hamp8",
+                                    include_channel_name = T,
+                                    include_file_name = T)
+sampling_rate<- 512
+
+channel_names<- EMEGShelper::biosemi64_channel_numbers_names %>%
+  filter(row_number() <= n() -1)
+
+
+time_between_samples_ms <- 1000/512
+```
+#Occipital oranizing setting response window and plotting 
+```{r}
+OCC_dat<- OCC_raw
+
+colnames(OCC_dat)[3:length(OCC_dat)] <- paste0(as.character(-100 + ((0:length(OCC_dat))*time_between_samples_ms)))
+                                    #,"ms")
+
+OCC_dat<-OCC_dat %>%
+  mutate(Condition = case_when(
+    grepl(pattern = "at1.ar.hamp8", x = file_name) ~ "Pleasant",
+    grepl(pattern = "at2.ar.hamp8", x = file_name) ~ "Neutral", 
+    grepl(pattern = "at3.ar.hamp8", x = file_name) ~ "Unpleasant", 
+  )) 
+
+OCC_dat$channel_names <- as.factor(recode(OCC_dat$channel_names,
+                                   `26` = "PO3",
+                                   `27` = "O1", 
+                                   `29` = "Oz", 
+                                   `30` = "POz", 
+                                   `31` = "Pz",
+                                   `63` = "PO4", 
+                                   `64` = "O2"))
+
+one_nine_responses_OCC <- OCC_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `9001.5625`)) %>%
+  group_by(Condition, channel_names) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_nine_responses_OCC$MS <- as.numeric(one_nine_responses_OCC$MS)
+
+one_nine_responses_condition_OCC<- OCC_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `9001.5625`)) %>%
+  group_by(Condition) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_nine_responses_condition_OCC$MS <- as.numeric(one_nine_responses_condition_OCC$MS)
+
+one_two_responses_OCC<- OCC_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `2001.5625`)) %>%
+  group_by(Condition, channel_names) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_two_responses_OCC$MS <- as.numeric(one_two_responses_OCC$MS)
+
+one_two_responses_condition_OCC<- OCC_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `2001.5625`)) %>%
+  group_by(Condition) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_two_responses_condition_OCC$MS<- as.numeric(one_two_responses_condition_OCC$MS)
+
+ggplot(data = one_two_responses_OCC, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  facet_wrap(. ~ channel_names)+
+  labs(title = "1-2 seconds Indv. OCC sensors Averages by Condition")
+
+ggplot(data = one_two_responses_condition_OCC, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  facet_wrap(. ~ channel_names)+
+  labs(title = "1-2 seconds OCC sensors Averaged by Condition")+
+  theme_minimal()
+
+ggplot(data = one_nine_responses_OCC, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  facet_wrap(. ~ channel_names)+
+  labs(title = "1-9 second Indv. OCC sensors Averaged by Condition")
+
+ggplot(data = one_nine_responses_condition_OCC, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  labs(title = "1- 9 second OCC sensors Averaged by Condition")+
+  theme_minimal()
+
+```
+#EPN organizing setting response window and plotting 
+```{r}
+EPN_dat<-EPN_raw
+time_between_samples_ms <- 1000/512
+#The number might have to change in the next line of code based on what you read in the in the EMEGShelper package
+colnames(EPN_dat)[3:length(EPN_dat)] <- paste0(as.character(-100 + ((0:length(EPN_dat))*time_between_samples_ms)))
+                                    #,"ms")
+
+EPN_dat<-EPN_dat %>%
+  mutate(Condition = case_when(
+    grepl(pattern = "at1.ar.hamp8", x = file_name) ~ "Pleasant",
+    grepl(pattern = "at2.ar.hamp8", x = file_name) ~ "Neutral", 
+    grepl(pattern = "at3.ar.hamp8", x = file_name) ~ "Unpleasant", 
+  )) 
+
+EPN_dat$channel_names <- as.factor(recode(EPN_dat$channel_names,
+                                   `23` = "P7", 
+                                   `25` = "PO5",
+                                   `27` = "O1", 
+                                   `60` = "P8",
+                                   `62` = "PO8",
+                                   `64` = "O2"))
+
+one_nine_responses_EPN <- EPN_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `9001.5625`)) %>%
+  group_by(Condition, channel_names) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_nine_responses_EPN$MS <- as.numeric(one_nine_responses_EPN$MS)
+
+one_nine_responses_condition_EPN<- EPN_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `9001.5625`)) %>%
+  group_by(Condition) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_nine_responses_condition_EPN$MS <- as.numeric(one_nine_responses_condition_EPN$MS)
+
+one_two_responses_EPN<- EPN_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `2001.5625`)) %>%
+  group_by(Condition, channel_names) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_two_responses_EPN$MS <- as.numeric(one_two_responses_EPN$MS)
+
+one_two_responses_condition_EPN<- EPN_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `2001.5625`)) %>%
+  group_by(Condition) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_two_responses_condition_EPN$MS<- as.numeric(one_two_responses_condition_EPN$MS)
+
+ggplot(data = one_two_responses_EPN, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  facet_wrap(. ~ channel_names)+
+  labs(title = "1-2 seconds Indv. EPN sensors Averages by Condition")
+
+ggplot(data = one_two_responses_condition_EPN, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  facet_wrap(. ~ channel_names)+
+  labs(title = "1-2 seconds EPN sensors Averaged by Condition")+
+  theme_minimal()
+
+ggplot(data = one_nine_responses_EPN, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  facet_wrap(. ~ channel_names)+
+  labs(title = "1-9 second Indv. EPN sensors Averaged by Condition")
+
+ggplot(data = one_nine_responses_condition_EPN, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  labs(title = "1- 9 second EPN sensors Averaged by Condition")+
+  theme_minimal()
+```
+#LPP organizing setting response window and plotting 
+```{r}
+LPP_dat<-LPP_raw
+time_between_samples_ms <- 1000/512
+colnames(LPP_dat)[3:5174] <- paste0(as.character(-100 + ((0:5171)*time_between_samples_ms)))
+                                    #,"ms")
+
+LPP_dat$file_name<- gsub(pattern = "/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/EEG/from_andrew_emegs_ssvepvid/VidSSVEP ARFiles/CategoryAverages12_3_19/Hamp/", replacement = "", x = LPP_dat$file_name)
+
+LPP_dat<-LPP_dat %>%
+  mutate(Condition = case_when(
+    grepl(pattern = "at1.ar.hamp8", x = file_name) ~ "Pleasant",
+    grepl(pattern = "at2.ar.hamp8", x = file_name) ~ "Neutral", 
+    grepl(pattern = "at3.ar.hamp8", x = file_name) ~ "Unpleasant", 
+  )) 
+
+LPP_dat$channel_names <- as.factor(recode(LPP_dat$channel_names,
+                                   `19` = "CP1", 
+                                   `31` = "Pz",
+                                   `32` = "CPz",
+                                   `48` = "Cz",
+                                   `56` = "CP2"))
+
+one_nine_responses_LPP <- LPP_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `9001.5625`)) %>%
+  group_by(Condition, channel_names) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_nine_responses_LPP$MS <- as.numeric(one_nine_responses_LPP$MS)
+
+one_nine_responses_condition_LPP<- LPP_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `9001.5625`)) %>%
+  group_by(Condition) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_nine_responses_condition_LPP$MS <- as.numeric(one_nine_responses_condition_LPP$MS)
+
+one_two_responses_LPP <- LPP_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `2001.5625`)) %>%
+  group_by(Condition, channel_names) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_two_responses_LPP$MS <- as.numeric(one_two_responses_LPP$MS)
+
+one_two_responses_condition_LPP <- LPP_dat %>%
+  select(file_name, channel_names, Condition, 
+         c(`1001.5625`: `2001.5625`)) %>%
+  group_by(Condition) %>%
+  summarize_all(mean) %>%
+  select(-c(file_name)) %>%
+  pivot_longer(., cols = c(4:length(.)), names_to = "MS")
+one_two_responses_condition_LPP$MS <- as.numeric(one_two_responses_condition_LPP$MS)
+
+
+ggplot(data = one_nine_responses_LPP, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  facet_wrap(. ~ channel_names)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  labs(title = "1-9 seconds Indv. LPP sensors averaged by Condition")
+
+ggplot(data = one_nine_responses_condition_LPP, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  labs(title = "1-9 seconds LPP sensors averaged by Condition ")+
+  theme_minimal()
+  
+ggplot(data = one_two_responses_LPP, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  facet_wrap(. ~ channel_names)+
+  labs(title = "1-2 seconds Indv. LPP sensors averaged by Condition")
+
+ggplot(data = one_two_responses_condition_LPP, aes(MS, value, group = Condition, color = Condition))+
+  geom_line(size = 1)+
+  scale_color_manual(values = c('grey','blue','red'))+
+  facet_wrap(. ~ channel_names)+
+  labs(title = "1-2 seconds LPP sensors averaged by Condition")
+```
+#ANOVAs 
+```{r}
+aov_raw<- EMEGShelper::read_ar_files(data_folders = ar_folder,
+                                    patterns = "ar.hamp8",
+                                    include_channel_name = T,
+                                    include_file_name = T)
+
+colnames(aov_raw)[3:length(aov_raw)] <- paste0(as.character(-100 + ((0:length(aov_raw))*time_between_samples_ms)))
+aov_raw$file_name<- gsub(pattern = "/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/EEG/from_andrew_emegs_ssvepvid/VidSSVEP ARFiles/CategoryAverages12_3_19/Hamp/", replacement = "", x = aov_raw$file_name)
+
+aov_dat <- aov_raw %>%
+  mutate(Condition = case_when(
+    grepl(pattern = "at1.ar.hamp8", x = file_name) ~ "Pleasant",
+    grepl(pattern = "at2.ar.hamp8", x = file_name) ~ "Neutral", 
+    grepl(pattern = "at3.ar.hamp8", x = file_name) ~ "Unpleasant", 
+  )) %>%
+  mutate(Par_ID = gsub(pattern = ".f.at[1-3].ar.hamp8", replacement = "", x = aov_raw$file_name)) %>%
+  mutate(Wave_avgs = rowMeans(select(., c(`1001.5625`: `9001.5625`)))) %>%
+  select(Par_ID, Wave_avgs, Condition, channel_names)
+
+
+#aov_raw$`1001.5625`
+#aov_raw$`9001.5625`
+#aov_raw$`2001.5625`
+
+channel_index <- 1 
+
+anova_tables <- data.frame()
+
+for (channel_index in 1:64) {
+  
+  current_data<- aov_dat %>%
+    filter(channel_names == channel_index)
+  
+  current_anova<- afex::aov_ez(id = "Par_ID", dv = "Wave_avgs", data = current_data, within = "Condition")
+  
+  anova_tables<- rbind(anova_tables, current_anova$anova_table)
+}
+
+anova_tables<- anova_tables %>%
+  `rownames<-`(channel_names$channel_name)
+```
+
+
+
+parietal stuff of significant. 1-9 seconds or 2-9 seconds average time points together. A 1-2 seconds. Sensors with the highest f value and then do a post-hocs for hte grouping. Each par there should be 3 categories. A row for every subject, column for each category, cells should be avg microvoltage for a sensor from 1-9 and 1-2 and put that into a RM ANOVA and do that for every sensor. 
+
+#Combining self-report and ssVEP data frames. 
+1-9 and 1-2 
+
+had to manually adjust the name of the first participant to have the set number included in the title of the hamp8 file 
+```{r}
+sr_data<- read_excel(path = "/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/Self_report/Perception of Videos_UGA.xlsx")
+header.true <- function(df) {
+ names(df) <- as.character(unlist(df[1,]))
+  df[-1,]
+}
+sr_data<- header.true(sr_data)
+
+sr_presentation_order<- read_excel("/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/Self_report/Presentation_Order.xlsx")
+
+par_ids<- sr_data$`Enter the Participants ID number`
+Flip <- function(x) 10 - x #necessary since we have higher emotions as lower numbers and that is confusing visually 
+#Getting the arousal data 
+arousing_raw<- sr_data %>%
+  .[, grep("How aroused did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  cbind(sr_presentation_order,.) %>%
+  rownames_to_column()
+
+arousing_word<- rep("aroused", nrow(arousing_raw))
+arousing_raw$rowname<- arousing_word
+
+arousing_dat <- arousing_raw %>%
+  filter(!Video == "Practice_Video") %>%
+  mutate(arousing_sr_avgs = rowMeans((select(., c(4:length(.)))))) %>%
+  select(rowname, Video, Category, arousing_sr_avgs)
+
+#Getting valence data 
+val_raw<- sr_data %>%
+  .[, grep("How pleasant did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  cbind(sr_presentation_order,.) %>%
+  rownames_to_column()
+
+val_word<- rep("valence", nrow(val_raw))
+val_raw$rowname<- val_word
+
+valence_dat <- val_raw %>%
+  filter(!Video == "Practice_Video") %>%
+  mutate(valence_sr_avgs = rowMeans((select(., c(4:length(.)))))) %>%
+  select(rowname, Video, Category, valence_sr_avgs)
+
+#Reading ssVEP stuff 
+ar_folder <- "/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/Self_report/steady_state_video/by_scene_hamp_files"
+time_between_samples_ms <- 1000/512
+
+# ssVEP by scene data 
+ssvep_presentation_order <- read_excel(path = "/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/Self_report/Presentation_Order.xlsx", sheet = "ssVEP_stim_order")
+
+ssvep_presentation_order$Scene_name<- gsub(pattern = "45vids_balanced/", replacement = "", x = ssvep_presentation_order$Scene_name)
+
+ssvep_presentation_order$Scene_name<- gsub(pattern = ".mp4", replacement = "", x = ssvep_presentation_order$Scene_name)
+
+one_nine_samples<- 512:4608
+one_two_samples <- 512:1024
+
+
+all_hamps <- dir(path = ar_folder, pattern = "ar.hamp")
+ssVEP_dat<- data.frame()
+
+#The loop counts 1, 10, 11, 12, 13 etc then 2,20,21,22 etc. 
+for (hamp_index in 1:length(all_hamps)) {
+  current_hamp <- all_hamps[hamp_index]
+  
+  path_to_current_hamp <- paste0(ar_folder,
+                                 "/",
+                                 current_hamp)
+  
+  current_vid_dat<- EMEGShelper::read_ar_file(path_to_ar = path_to_current_hamp, extract_channels = c(OCC_sensor_numbers,LPP_sensor_numbers, EPN_sensor_numbers),
+                                              include_channel_name = T,
+                                              include_file_name = T) %>%
+    as.data.frame() %>%
+    cbind(path_to_current_hamp,.)
+
+  current_vid_dat$path_to_current_hamp<- gsub(pattern = "/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/Self_report/steady_state_video/by_scene_hamp_files/", replacement = "", x = current_vid_dat$path_to_current_hamp)
+  
+  colnames(current_vid_dat)[4:length(current_vid_dat)] <- paste0(as.character(-100 + ((0:length(current_vid_dat))*time_between_samples_ms)))
+  
+  ssVEP_raw <- current_vid_dat %>%
+    mutate(one_nine_Wave_avgs = rowMeans(select(., c(`1001.5625`: `9001.5625`)))) %>%
+    mutate(one_two_Wave_avgs = rowMeans(select(., c(`1001.5625`: `2001.5625`)))) %>%
+    select(path_to_current_hamp, file_name, channel_names, one_nine_Wave_avgs, one_two_Wave_avgs)
+  
+  #Andrew code
+  words <- ssVEP_raw$path_to_current_hamp %>% stringi::stri_extract_all_words() %>%
+    unlist()
+  index_logical <- c(F,T,F)
+  temp<-words[index_logical]
+  temp2<- gsub(pattern = "f.at", replacement = "", x = temp)
+  ssVEP_raw$path_to_current_hamp<- temp2
+  vid_to_bind<- ssvep_presentation_order %>%
+    filter(Scene_order == ssVEP_raw$path_to_current_hamp) %>%
+    slice(rep(1:n(), each = length(ssVEP_raw$path_to_current_hamp)))
+  
+  if (nrow(vid_to_bind) ==0) {
+    break
+  }
+  ssVEP_raw<-cbind(ssVEP_raw, vid_to_bind)
+  
+  ssVEP_dat<-rbind(ssVEP_dat,ssVEP_raw)
+}
+
+ssVEP_and_sr_raw<- ssVEP_dat %>%
+  group_by(channel_names, Scene_name) %>%
+  summarize_all(mean) %>%
+  select(Scene_name, channel_names, one_nine_Wave_avgs, one_two_Wave_avgs, Scene_category)
+
+ssVEP_and_sr_raw<- ssVEP_and_sr_raw[order(ssVEP_and_sr_raw$Scene_name),]
+
+#Combining ssVEP and self-report (SR) data. For loop was not working ask andrew if I am missing anything obvious 
+ar_raw2<- arousing_dat[rep(seq_len(nrow(arousing_dat)), each = length(unique(ssVEP_and_sr_raw$channel_names))),] 
+
+ordered_ar_raw<- ar_raw2[order(ar_raw2$Video),]
+
+val_raw2<- valence_dat[rep(seq_len(nrow(valence_dat)), each = length(unique(ssVEP_and_sr_raw$channel_names))),] 
+
+ordered_val_raw <- val_raw2[order(val_raw2$Video),]
+
+ssVEP_and_sr_dat<- ssVEP_and_sr_raw %>%
+  cbind.data.frame(., ordered_ar_raw, ordered_val_raw) %>%
+  select(Scene_name, Scene_category, channel_names, one_nine_Wave_avgs, one_two_Wave_avgs, arousing_sr_avgs, valence_sr_avgs)
+
+
+```
+#Correlations between ssVEP and self report (matrices and plots)
+```{r}
+cor_dat_LPP <- ssVEP_and_sr_dat %>%
+  `rownames<-`(make.names(ssVEP_and_sr_dat$Scene_name, unique = T)) %>%
+  filter(channel_names %in% LPP_sensor_numbers) %>%
+  group_by(Scene_category) %>%
+  summarize_all(mean) %>%
+  correlate(.) %>%
+  focus(one_nine_Wave_avgs, one_two_Wave_avgs, arousing_sr_avgs, valence_sr_avgs, mirror = T)
+
+cor_dat_EPN <- ssVEP_and_sr_dat %>%
+  `rownames<-`(make.names(ssVEP_and_sr_dat$Scene_name, unique = T)) %>%
+  filter(channel_names %in% EPN_sensor_numbers) %>%
+  group_by(Scene_category) %>%
+  summarize_all(mean) %>%
+  correlate(.) %>%
+  focus(one_nine_Wave_avgs, one_two_Wave_avgs, arousing_sr_avgs, valence_sr_avgs, mirror = T)
+
+cor_dat_OCC<- ssVEP_and_sr_dat %>%
+  `rownames<-`(make.names(ssVEP_and_sr_dat$Scene_name, unique = T)) %>%
+  filter(channel_names %in% OCC_sensor_numbers) %>%
+  group_by(Scene_category) %>%
+  summarize_all(mean) %>%
+  correlate(.) %>%
+  focus(one_nine_Wave_avgs, one_two_Wave_avgs, arousing_sr_avgs, valence_sr_avgs, mirror = T)
+
+
+corr_p1<-ssVEP_and_sr_dat %>%
+  filter(channel_names %in% LPP_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_nine_Wave_avgs, y = arousing_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-9 seconds Average LPP Amplitudes and Self-report Arousal Correlation")
+corr_p1
+corr_p2<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% LPP_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_two_Wave_avgs, y = arousing_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-2 seconds Average LPP Amplitudes and Self-report Arousal Correlation")
+corr_p2
+corr_p3<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% LPP_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_nine_Wave_avgs, y = valence_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-9 seconds Average LPP Amplitudes and Self-report Valence Correlation")
+corr_p3
+corr_p4<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% LPP_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_two_Wave_avgs, y = valence_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-2 seconds Average LPP Amplitudes and Self-report Valence Correlation")
+corr_p4
+corr_p5<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% EPN_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_nine_Wave_avgs, y = arousing_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-9 seconds Average EPN Amplitudes and Self-report Arousal Correlation")
+corr_p5
+corr_p6<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% EPN_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_nine_Wave_avgs, y = arousing_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-2 seconds Average EPN Amplitudes and Self-report Arousal Correlation")
+corr_p6
+corr_p7<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% EPN_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_nine_Wave_avgs, y = valence_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-9 seconds Average EPN Amplitudes and Self-report Valence Correlation")
+corr_p7
+corr_p8<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% EPN_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_two_Wave_avgs, y = valence_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-2 seconds Average EPN Amplitudes and Self-report Valence Correlation")
+corr_p8
+corr_p9<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% OCC_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_nine_Wave_avgs, y = arousing_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-9 seconds Average Occipital Amplitudes and Self-report Arousal Correlation")
+corr_p9
+corr_p10<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% OCC_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_two_Wave_avgs, y = arousing_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-2 seconds Average Occipital Amplitudes and Self-report Arousal Correlation")
+corr_p10
+corr_p11<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% OCC_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_nine_Wave_avgs, y = valence_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-9 seconds Average Occipital Amplitudes and Self-report Valence Correlation")
+corr_p11
+
+corr_p12<- ssVEP_and_sr_dat %>%
+  filter(channel_names %in% OCC_sensor_numbers) %>%
+  group_by(Scene_name, Scene_category)%>%
+  summarize_all(mean) %>%
+  ggplot(data = ., aes(x = one_two_Wave_avgs, y = valence_sr_avgs)) +
+  geom_point( aes(color = as.factor(Scene_category)))+
+  scale_color_manual(values = c('blue','grey','red'))+
+  geom_smooth(method = lm)+
+  theme(legend.title = element_blank())+
+  labs(title = "1-2 seconds Average Occipital Amplitudes and Self-report Valence Correlation")
+corr_p12
+
+
+
+
+
+# Figure out how to arrange the grids later 
+#ggarrange(corr_p1, corr_p2, corr_p3, corr_p4,
+#          common.legend = T,
+#          labels = c("1-9 seconds for Arousal", "1-2 seconds for Arousal", "1-9 seconds for Valence:,"),
+ #         font.label = list(size = 10),
+  #        label.x = 0,
+   #       ncol = 1, nrow =4) 
+
+```
