@@ -1,0 +1,605 @@
+---
+title: "Self_report"
+author: "Matt Gehr"
+date: "8/30/2021"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(readxl)
+library(rstatix)
+library(devtools)
+library(ggbiplot)
+```
+#Loading in the data 
+```{r Loading data}
+data<- read_excel(path = "/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/Self_report/Perception of Videos_UGA.xlsx")
+header.true <- function(df) {
+ names(df) <- as.character(unlist(df[1,]))
+  df[-1,]
+}
+data<- header.true(data)
+presentation_order<- read_excel("/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/Self_report/Presentation_Order.xlsx")
+
+par_ids<- data$`Enter the Participants ID number`
+
+presentation_order %>%
+  filter(Scene_category_37 == 9)
+```
+#Getting data in order, adding video names, categories, and row means
+```{r Segmenting data for graphing}
+Flip <- function(x) 10 - x #necessary since we have higher emotions as lower numbers and that is confusing visually 
+
+valence_dat<- data %>%
+  .[, grep("How pleasant did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.) %>%
+  rownames_to_column()
+
+valence_word<- rep("pleasant", nrow(valence_dat))
+valence_dat$rowname<- valence_word
+
+
+arousing_dat<- data %>%
+  .[, grep("How aroused did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.) %>%
+  rownames_to_column()
+
+arousing_word<- rep("aroused", nrow(arousing_dat))
+arousing_dat$rowname<- arousing_word
+
+
+surprised_dat<- data %>%
+  .[, grep("How surprised did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.) %>%
+  rownames_to_column()
+
+surprised_word<- rep("surprised", nrow(surprised_dat))
+surprised_dat$rowname<- surprised_word
+
+anger_dat<- data %>%
+  .[, grep("How angry did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.) %>%
+  rownames_to_column()
+
+anger_word<- rep("angry", nrow(anger_dat))
+anger_dat$rowname<- anger_word
+
+disgusted_dat<- data %>%
+  .[, grep("How disgusted did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.)%>%
+  rownames_to_column()
+
+disgusted_word<- rep("disgusted", nrow(disgusted_dat))
+disgusted_dat$rowname<- disgusted_word
+
+fear_dat<- data %>%
+  .[, grep("How fearful did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.) %>%
+  rownames_to_column()
+
+fear_word<- rep("fearful", nrow(fear_dat))
+fear_dat$rowname<- fear_word
+
+action_dat<- data %>%
+  .[, grep("How much action was depicted in the scene?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.)%>%
+  rownames_to_column()
+
+action_word<- rep("action", nrow(action_dat))
+action_dat$rowname<- action_word
+
+sad_dat<- data %>%
+  .[, grep("How sad did the previous scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.)%>%
+  rownames_to_column()
+
+sad_word<- rep("sad", nrow(sad_dat))
+sad_dat$rowname<- sad_word
+
+joy_dat<- data %>%
+  .[, grep("How joyful did previous the scene make you feel?", names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  `rownames<-` (par_ids) %>%
+  t() %>%
+  as.data.frame()%>%
+  mutate(means = rowMeans(x = .,dims = 1)) %>%
+  cbind(presentation_order,.)%>%
+  rownames_to_column()
+
+joy_word<- rep("joyful", nrow(joy_dat))
+joy_dat$rowname<- joy_word
+
+```
+#Combining data and changing structure of necessary columns 
+```{r Combining graphical segmented data}
+all_dat<- do.call("rbind", list(action_dat, anger_dat, arousing_dat, disgusted_dat, fear_dat, joy_dat, sad_dat, surprised_dat, valence_dat))
+
+all_avgs<- all_dat %>%
+  select(rowname, Video, Category, means) %>%
+  `colnames<-` (c("Discrete_emotion", "Video_name", "Vid_category", "response_means")) %>%
+  as.data.frame() %>%
+  filter(!Video_name == "Practice_Video")
+
+factor_columns<- c("Discrete_emotion", "Video_name", "Vid_category")
+all_avgs[factor_columns]<- lapply(all_avgs[factor_columns], factor)
+all_avgs$Vid_category<-recode_factor(all_avgs$Vid_category, `999` = "Practice", `1` = "Pleasant", `2` = "Neutral", `3` = "Unpleasant")
+
+all_avgs[rowSums(is.na(all_avgs)) > 0,]
+#Check to make sure there are no NAs 
+```
+#Graphing and averaging by discrete category and dimensional data 
+```{r Graphing categorical averages}
+graph_avg<-all_avgs %>%
+  group_by(Discrete_emotion, Vid_category) %>%
+  dplyr::summarize("Category_mean" = mean(response_means),
+            "Number of response" = n())
+
+graph_avg %>%
+  ggplot(data = ., aes(x = Vid_category, y = Category_mean, fill = Vid_category))+
+  geom_bar(position = "dodge", stat = "identity")+
+  scale_fill_manual(values = c('blue','grey','red'))+
+  labs(title = "Categorical_Discrete_Breakdown")+
+  facet_wrap(~Discrete_emotion)
+
+
+graph_avg_dimensional<- all_avgs %>%
+  filter(Discrete_emotion == c("aroused", "pleasant")) %>%
+  group_by(Vid_category, Discrete_emotion) %>%
+  dplyr::summarize("Category_mean" = mean(response_means),
+            "Number of response" = n())
+
+graph_avg_dimensional %>%
+  ggplot(data = ., aes(x = Vid_category, y = Category_mean, fill = Vid_category))+
+  geom_bar(position = "dodge", stat = "identity")+
+  scale_fill_manual(values = c('blue','grey','red'))+
+  labs(title = "Categorical_Discrete_Breakdown")+
+  facet_wrap(~Discrete_emotion)
+```
+#Graphing and averaging by scene 
+```{r Graphing scene averages}
+all_avgs %>%
+  group_by(Discrete_emotion, Video_name) %>%
+  dplyr::summarize("Category_mean" = mean(response_means))
+
+tiff("/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/Self_report/Scene_breakdown.tiff", unit = "in", width = 20 , height = 14, res = 300)
+all_avgs %>%
+  #filter(Discrete_emotion == "fearful",
+   #      response_means > 3) %>%
+  ggplot(data = ., aes(x = Discrete_emotion, y = response_means, fill = Vid_category))+
+  geom_bar(position = "dodge", stat = "identity")+
+  scale_fill_manual(values = c('blue','grey','red'))+
+  labs(title = "Categorical_Discrete_Breakdown")+
+  facet_wrap(~Video_name)+
+  theme_classic()+
+  theme(axis.text = element_text(size = 10),
+        axis.text.x = element_text(size = 15, angle = 45, hjust = 1),
+        axis.title = element_text(size = 10, face = "bold"),
+        strip.text = element_text(size = 20),
+        )
+  dev.off()
+```
+#Significance testing prep: Gets the data in long form with the participant ID, discrete emotion, 
+```{r Significance testing prep}
+Flip <- function(x) 10 - x #necessary since we have higher emotions as lower numbers and that is confusing visually 
+
+toMatch<- c("How pleasant did the previous scene make you feel?", "How aroused did the previous scene make you feel?", "How disgusted did the previous scene make you feel?", "How fearful did the previous scene make you feel?", "How much action was depicted in the scene?", "How sad did the previous scene make you feel?",  "How joyful did previous the scene make you feel?", "How angry did the previous scene make you feel?", "How surprised did the previous scene make you feel?")
+
+dat_relevant<-data %>%
+  .[, grep(paste(toMatch, collapse = "|"), names(.))] %>%
+  sapply(as.numeric) %>%
+  Flip() %>%
+  t()%>%
+  as.data.frame() 
+
+presentation_order_long<- presentation_order %>%
+  slice(rep(1:n(), each = 9))
+
+dat_long<- data.frame()
+  
+for (col in 1:ncol(dat_relevant)){
+  sliced_col<- dat_relevant[col]
+  par_id_tobind<- rep(par_ids[col], each = length(dat_relevant$V1))
+  temp1<- cbind(sliced_col, par_id_tobind, presentation_order_long)
+  colnames(temp1)<- (c("Response", "Participant_ID", "Video_name", "Video_category"))
+  dat_long<- rbind(dat_long, temp1)
+}  
+  
+dat_long<- add_column(dat_long, Discrete_emotion = NA)
+
+dat_long[grep("How.aroused.did.the.previous.scene.make.you.feel?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Aroused"
+
+dat_long[grep("How.pleasant.did.the.previous.scene.make.you.feel?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Pleasant"
+
+dat_long[grep("How.joyful.did.previous.the.scene.make.you.feel?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Joyful"
+
+dat_long[grep("How.surprised.did.the.previous.scene.make.you.feel?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Surprised"
+
+dat_long[grep("How.sad.did.the.previous.scene.make.you.feel?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Sad"
+
+dat_long[grep("How.angry.did.the.previous.scene.make.you.feel?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Angry"
+
+dat_long[grep("How.disgusted.did.the.previous.scene.make.you.feel?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Disgusted"
+
+dat_long[grep("How.fearful.did.the.previous.scene.make.you.feel?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Fearful"
+
+dat_long[grep("How.much.action.was.depicted.in.the.scene?", rownames(dat_long), value = F), "Discrete_emotion"] <- "Action"
+
+cols_to_factor<- c("Participant_ID", "Video_name", "Video_category", "Discrete_emotion")
+
+#dat_long<- dat_long %>%
+#  mutate_each(funs(factor(.)), cols_to_factor)  
+
+dat_long <- dat_long %>%
+  `colnames<-` (c("Response", "Participant_ID", "Video_name", "Video_Category", "Luminance", "Video_category", "Discrete_emotion"))
+
+dat_long$Video_category<- recode_factor(dat_long$Video_category, `999` = "Practice", `1` = "Pleasant", `2` = "Neutral", `3` = "Unpleasant", `9` = "Removed")
+
+```
+#Action ANOVA 
+```{r action ANOVA}
+action_aov_dat<- dat_long %>%
+  filter(Discrete_emotion == "Action",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+  dplyr::summarize(category_means = mean(Response, na.rm=TRUE)) %>%
+  ungroup(.)
+
+action_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+action_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+pairwise_t_test(data = action_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+```
+#Anger ANOVA 
+```{r anger ANOVA}
+anger_aov_dat<- dat_long %>%
+  filter(., Discrete_emotion == "Angry",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+   dplyr::summarize(category_means = mean(Response)) %>%
+  ungroup(.)
+
+anger_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+anger_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+pairwise_t_test(data = anger_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+```
+#Arousal ANOVA 
+```{r arousal ANOVA}
+arousal_aov_dat<- dat_long %>%
+  filter(., Discrete_emotion == "Aroused",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+   dplyr::summarize("category_means" = mean(Response),
+            "Number of response" = n()) %>%
+  ungroup(.)
+
+arousal_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+arousal_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+
+pairwise_t_test(data = arousal_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+```
+#Disgusted ANOVA 
+```{r disgusted ANOVA}
+disgusted_aov_dat<- dat_long %>%
+  filter(., Discrete_emotion == "Disgusted",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+   dplyr::summarize(category_means = mean(Response)) %>%
+  ungroup(.)
+
+disgusted_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+disgusted_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+pairwise_t_test(data = disgusted_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+```
+#Fear ANOVA
+```{r fear ANOVA}
+fear_aov_dat<- dat_long %>%
+  filter(., Discrete_emotion == "Fearful",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+   dplyr::summarize(category_means = mean(Response)) %>%
+  ungroup(.)
+
+fear_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+fear_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+
+pairwise_t_test(data = fear_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+
+```
+#Joy ANOVA
+```{r Joy ANOVA}
+joy_aov_dat<- dat_long %>%
+  filter(., Discrete_emotion == "Joyful",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+   dplyr::summarize(category_means = mean(Response)) %>%
+  ungroup(.)
+
+joy_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+joy_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+pairwise_t_test(data = joy_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+
+```
+#SAD ANOVA
+```{r Sad ANOVA}
+sad_aov_dat<- dat_long %>%
+  filter(., Discrete_emotion == "Sad",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+   dplyr::summarize(category_means = mean(Response)) %>%
+  ungroup(.)
+
+sad_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+sad_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+pairwise_t_test(data = sad_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+
+```
+#Surprised ANOVA
+```{r Surprised ANOVA}
+surprised_aov_dat<- dat_long %>%
+  filter(., Discrete_emotion == "Surprised",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+   dplyr::summarize(category_means = mean(Response)) %>%
+  ungroup(.)
+
+surprised_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+surprised_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+pairwise_t_test(data = surprised_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+```
+#Valence ANOVA
+```{r Valence ANOVA}
+valence_aov_dat<- dat_long %>%
+  filter(., Discrete_emotion == "Pleasant",
+         !Video_name == "Practice_Video",
+         !Video_category == "Removed") %>%
+  group_by(Video_category, Participant_ID) %>%
+   dplyr::summarize(category_means = mean(Response)) %>%
+  ungroup(.)
+
+valence_aov_dat %>%
+  group_by(Video_category) %>%
+   dplyr::summarize(Means = mean(category_means, na.rm = TRUE))
+
+valence_aov_dat %>%
+  anova_test(dv = category_means, wid = Participant_ID, within = Video_category)%>%
+  get_anova_table() 
+pairwise_t_test(data = valence_aov_dat,formula = category_means ~ Video_category, paired = FALSE, p.adjust.method = "bonferroni")
+```
+#PCA stuff 
+```{r PCA organizing data}
+example<- mtcars
+
+example.pca<- prcomp(mtcars[])
+
+
+pca_action<- action_dat %>%
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Action"))
+
+pca_anger<- anger_dat %>%
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Angry"))
+
+pca_arousal<- arousing_dat%>%
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Aroused")) 
+
+pca_disgusted<- disgusted_dat %>%
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Disgusted"))
+
+pca_fear<- fear_dat %>% 
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Fearful"))
+
+pca_joy<- joy_dat %>%
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Joyful"))
+
+pca_sad<- sad_dat %>%
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Sad"))
+
+pca_surprised<- surprised_dat %>%
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Surprised"))
+
+pca_valence <- valence_dat %>%
+  select(Video, means) %>%
+  remove_rownames(.) %>% 
+  column_to_rownames(var="Video") %>%
+  `colnames<-` (c("Pleasant"))
+
+pca_dat<- do.call("cbind", list(pca_action, pca_anger, pca_arousal, pca_disgusted, pca_fear, pca_joy, pca_sad, pca_surprised, pca_valence))
+
+pca_dat<- pca_dat %>%
+  filter(!rownames(.)== "Practice_Video")
+
+pca_dat<- pca_dat %>%
+  cbind(., presentation_order$Category[2:46]) %>%
+  .[order(presentation_order$Category[2:46]),] %>%
+  cbind(.,c(rep("Pleasant", 18), rep("Neutral", 9), rep("Unpleasant", 18)))
+
+pca_graph<-prcomp(pca_dat[,c(1:9)], center = TRUE,scale. = TRUE)
+
+ggbiplot(pca_graph, labels = rownames(pca_dat))
+ggbiplot(pca_graph, ellipse = TRUE, choices =c(3,4)) 
+
+```
+#Graphing PCA data 
+```{r PCA graphing data}
+#discrete_mean_graph
+
+ggbiplot(pca_graph, ellipse = TRUE, labels= rownames(pca_dat), groups = pca_dat$`c(rep("Pleasant", 18), rep("Neutral", 9), rep("Unpleasant", 18))`) +
+  scale_color_manual(name = "Condition", values = c("Black", "Blue", "Red"))+
+  ggtitle("PCA of All Discrete Emotions")+
+  theme_minimal()
+#A plot of conditions applied to the scenes. Shows that our classification was not too far off maybe a few videos could be adjusted but not bad for the self report 
+
+#ggbiplot(pca_graph, ellipse = TRUE, choices =c(3,4) , labels= rownames(pca_dat), groups = pca_dat$`c(rep("Pleasant", 18), rep("Neutral", 9), rep("Unpleasant", 18))`)+
+#  theme_minimal() +
+#  ggtitle("PCA 3 & 4")
+
+pca_graph_negative<-prcomp(pca_dat[,c(2,4,5,7)], center = TRUE,scale. = TRUE)
+
+ggbiplot(pca_graph_negative, ellipse = TRUE, labels= rownames(pca_dat), groups = pca_dat$`c(rep("Pleasant", 18), rep("Neutral", 9), rep("Unpleasant", 18))`)+
+  scale_color_manual(name = "Condition", values = c("Black", "Blue", "Red"))+
+  theme_minimal() +
+  ggtitle("PCA Negative Discrete")
+
+pca_graph_arousing<- prcomp(pca_dat[,c(1,3,8)], center = TRUE,scale. = TRUE)
+
+ggbiplot(pca_graph_arousing, ellipse = TRUE, labels= rownames(pca_dat), groups = pca_dat$`c(rep("Pleasant", 18), rep("Neutral", 9), rep("Unpleasant", 18))`)+
+  scale_color_manual(name = "Condition", values = c("Black", "Blue", "Red"))+
+  theme_minimal() +
+  ggtitle("PCA Arousing Discrete")
+
+pca_graph_dimension<- prcomp(pca_dat[,c(3,9)], center = TRUE,scale. = TRUE)
+
+ggbiplot(pca_graph_dimension, ellipse = TRUE, labels= rownames(pca_dat), groups = pca_dat$`c(rep("Pleasant", 18), rep("Neutral", 9), rep("Unpleasant", 18))`)+
+  scale_color_manual(name = "Condition", values = c("Black", "Blue", "Red"))+
+  theme_minimal() +
+  ggtitle("PCA Dimensional(Valence & Arousing)")
+```
+#Valence and Arousal with each video as the dat. The category was based on the SSVEPVidSetCon file (/Users/matthew/Documents/Documents/Professional/Graduate school/UGA/Lab stuff/Perception of videos/ssVEP/Analysis/EEG/SSVEP log Files/SSVEPVidSetCon.xlsx)
+```{r}
+arousing_dat_2 <- arousing_dat %>%
+  select(means) %>%
+  `colnames<-` (c("arousal_means"))
+
+dimensional_emotion_dat <- cbind.data.frame(valence_dat, arousing_dat_2) %>%
+  mutate(Scene_category_37 = case_when(
+    grepl(pattern = "1", x = Scene_category_37) ~ "Pleasant",
+    grepl(pattern = "2", x = Scene_category_37) ~ "Neutral", 
+    grepl(pattern = "3", x = Scene_category_37) ~ "Unpleasant",
+    grepl(pattern = "9", x = Scene_category_37) ~ "Removed"
+  )) %>%
+  select(Video, Scene_category_37, arousal_means, means) %>%
+#  filter(Scene_category_37 != "To be Removed") %>%
+  `colnames<-` (c("Video", "Scene_category_37", "arousal_means", "valence_means"))
+dimensional_emotion_dat$Video<- as.factor(dimensional_emotion_dat$Video)
+dimensional_emotion_dat$Scene_category_37<- as.factor(dimensional_emotion_dat$Scene_category_37)
+
+ggplot(dimensional_emotion_dat, aes(x = arousal_means , y = valence_means, color = Scene_category_37)) +
+  scale_color_manual(values = c("Black", "Blue", "Purple","Red")) + 
+    geom_text(aes(label = Video), size = 2, nudge_x = .22)
+
+```
+
